@@ -21,6 +21,8 @@ All outputs follow `references/output-schema.md`. Paper type detection uses
 | `references/presentation-style-guide.md` | Content compression rules for slides |
 | `references/pptx-handoff.md` | How to call the pptx skill for rendering |
 | `scripts/extract_pdf_meta.py` | Optional: extract PDF metadata to JSON |
+| `scripts/pdf_to_markdown.py` | Convert PDF to structured Markdown before analysis |
+| `scripts/extract_pdf_figures.py` | Extract figures from original PDF (used in presentation mode) |
 
 ## Mode Selection
 
@@ -37,6 +39,27 @@ Default mode: `standard`. Detect from user's request:
 If ambiguous, use `standard` and offer to switch.
 
 ## Workflow
+
+### Step 0: PDF → Markdown Preprocessing
+
+Before any analysis, convert the PDF to structured Markdown using markitdown.
+This drastically reduces token consumption compared to sending raw PDF binary
+to the LLM, and produces cleaner structured text for downstream parsing.
+
+```
+python scripts/pdf_to_markdown.py <pdf_path> -o <output.md>
+```
+
+The script produces a `.md` file with:
+- **YAML front-matter**: source filename, page count, conversion timestamp
+- **Structured Markdown**: headings, tables, lists preserved from the PDF
+
+**All subsequent steps (Step 1–4) operate on the generated `.md` file, not the
+original PDF.** The only exception is figure extraction in
+`presentation_with_figures` mode (Step B0), which reads the original PDF because
+images cannot be represented in Markdown.
+
+If the user has not run this step yet, run it automatically before proceeding.
 
 ### Step 1: Assess Input Quality
 
@@ -120,9 +143,13 @@ If not specified, use defaults silently.
 
 Before building the slide plan, run:
 ```
-python scripts/extract_pdf_figures.py <pdf_path>
+python scripts/extract_pdf_figures.py <original_pdf_path>
 ```
 This saves all figures to `figures/` and writes `figures/index.json` with `name`, `path`, and `page` for each image. Use this index when assigning `figure_ref` paths in the handoff.
+
+> **Note**: This step reads the **original PDF** (not the Markdown output),
+> because figures/images cannot be represented in Markdown text.
+> All other analysis steps use the `.md` file generated in Step 0.
 
 ### Step B: Build Slide Plan
 

@@ -15,6 +15,7 @@
 - **反幻觉机制**：每个观点强制标注 `[原文声明]` 或 `[模型归纳]`，并绑定原文位置证据
 - **论文类型感知**：先分类（AI/深度学习、传统算法、系统工程、实验实证、综述、跨学科），再套对应方法分析模板
 - **PDF 质量分层**：良好 / 降级 / 严重降级三档处理，优雅降级而非直接报错
+- **Markitdown 预处理**：分析前先将 PDF 转为结构化 Markdown，大幅降低 token 消耗
 - **PPT 自动化管道**：演讲模式下自动提取 PDF 图表、构建幻灯片计划、调用 `pptx` skill 生成文件
 - **前作关系追踪**：`extended` 模式从参考文献中识别自引，推断课题组研究脉络（仅基于论文内部，不做外部检索）
 - **中英双语触发**：中英文触发词均支持
@@ -26,8 +27,8 @@
 ### 前置条件
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI 已安装
-- Python 3.8+（用于 PDF 图表提取脚本）
-- Python 依赖：`pip install pymupdf pypdf`
+- Python 3.10+（markitdown 最低要求 3.10）
+- Python 依赖：`pip install pymupdf pypdf 'markitdown[pdf]'`
 - 如需生成 PPT，还需安装 anthropics官方的[`pptx` skill]及其依赖
 
 ### 安装
@@ -37,6 +38,24 @@ npx skills add flyer-Li/paper-analyst
 ```
 
 > 也可以手动克隆：`git clone https://github.com/flyer-Li/paper-analyst ~/.claude/skills/paper-analyst`
+
+### 安装 Python 依赖
+
+```bash
+# 方式一：pip install（推荐，自动注册 CLI 命令）
+pip install -e .
+
+# 方式二：仅安装依赖
+pip install -r requirements.txt
+```
+
+安装后可直接使用以下 CLI 命令：
+
+```bash
+pdf-to-markdown paper.pdf -o paper.md
+extract-pdf-meta paper.pdf
+extract-pdf-figures paper.pdf --output-dir ./out
+```
 
 ### 使用
 
@@ -121,6 +140,9 @@ npx skills add flyer-Li/paper-analyst
 
 ```
 paper-analyst/
+├── pyproject.toml                  # 项目元数据与依赖声明
+├── requirements.txt                # pip 依赖清单
+├── setup.py                        # 旧工具链兼容 shim
 ├── SKILL.md                        # Skill 主配置（Claude Code 入口）
 ├── references/
 │   ├── output-schema.md            # 输出格式规范（7 节结构）
@@ -130,6 +152,8 @@ paper-analyst/
 │   ├── presentation-style-guide.md # 演讲内容压缩规则
 │   └── pptx-handoff.md             # pptx skill 调用接口规范
 └── scripts/
+    ├── __init__.py                 # Python 包标记
+    ├── pdf_to_markdown.py          # PDF → Markdown 预处理（markitdown）
     ├── extract_pdf_meta.py         # PDF 元数据提取
     └── extract_pdf_figures.py      # PDF 图表提取
 ```
@@ -140,6 +164,7 @@ paper-analyst/
 
 | 依赖 | 用途 | 安装 |
 |------|------|------|
+| `markitdown` | PDF → Markdown 预处理（降低 token 消耗） | `pip install 'markitdown[pdf]'` |
 | `pymupdf` | PDF 图表提取 | `pip install pymupdf` |
 | `pypdf` | PDF 元数据读取 | `pip install pypdf` |
 | `pptx` skill | PPT 文件生成 | 单独安装，见其 README |
