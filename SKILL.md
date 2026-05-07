@@ -37,8 +37,7 @@ Default mode: `standard`. Detect from the user's request:
 | `quick` | "quick", "简单说", "一句话", "简要" | Header + info + abstract + 3 contributions |
 | `standard` | (default) | Full analysis: Sections 1–6 |
 | `extended` | "前作", "课题组", "prior work" | standard + author/group prior work (Section 7) |
-| `presentation` | "PPT", "组会", "汇报大纲", "slides" | standard + slide plan + HTML/PPTX |
-| `presentation_with_figures` | "图表", "figures", "带图", "关键图" | presentation + figure annotations |
+| `presentation` | "PPT", "组会", "汇报大纲", "slides", "图表", "figures", "带图" | standard + slide plan + HTML/PPTX, with paper figures embedded by default |
 
 If ambiguous, use `standard` and offer to switch.
 
@@ -230,6 +229,7 @@ Check whether the user specified any of:
 - `talk_style` — `technical` (default) / `overview` / `discussion`
 - `emphasis` — sections to expand
 - `skip` — sections to omit
+- `figures` — `auto` (default, attempt extraction in Step B0) or `none` (triggered by "只要文字" / "no figures" / "纯文字" / "text only")
 
 Use defaults silently for everything not specified, **except** `slide_format`:
 if not given, ask once:
@@ -240,9 +240,9 @@ If they don't respond or say "随便" / "default", use `html`. HTML is the defau
 because: (1) no external skill dependency, (2) single self-contained file,
 (3) lower token cost (the agent generates code directly vs. invoking another LLM skill).
 
-### Step B0: Extract Figures (presentation_with_figures only)
+### Step B0: Extract Figures (default)
 
-Before building the slide plan:
+Before building the slide plan, attempt to extract figures from the original PDF:
 
 ```
 python scripts/extract_pdf_figures.py <original_pdf_path>
@@ -253,6 +253,17 @@ and `page` for each image. Use this index when assigning `figure_ref` paths in
 Step B / Step C. Reads the **original PDF** (not the Markdown), because figures
 aren't represented in Markdown text.
 
+**Skip extraction if any of the following:**
+- `figures = none` (user said "只要文字" / "no figures" / "纯文字" / "text only")
+- The original PDF is not available (e.g. user pasted text only)
+- Extraction script fails (e.g. PDF is image-only with no embedded figures) —
+  log the failure briefly to the user, fall back to text-only deck
+
+**If figures already exist in another folder** (e.g. `paper/<name>_files/` from
+an arxiv HTML download, or a user-provided directory), use those directly
+without re-running the script. Copy/symlink the relevant ones into the deck's
+`figures/` folder so the HTML references resolve cleanly.
+
 ### Step B: Build Slide Plan
 
 Follow `references/presentation-schema.md` for the JSON structure.
@@ -260,8 +271,10 @@ Follow `references/presentation-style-guide.md` for compression rules.
 
 - Map each slide role to its corresponding output-schema section
 - Apply user overrides (`emphasis` → expand, `skip` → omit)
-- For `presentation_with_figures`: set `figure_needed: true` on method/result
-  slides where a figure is the primary evidence; add `figure_ref` and `figure_hint`
+- When figures are available (Step B0 succeeded), set `figure_needed: true` on
+  method/result slides where a figure is the primary evidence; add `figure_ref`
+  and `figure_hint`. The architecture diagram (typically Figure 1) and result
+  charts/tables are the highest-value embeds for academic decks.
 - Slide count from `duration_hint`: 10min → 6–7, 20min → 9–10, 30min → 12–14
 
 ### Step C: Generate Slides
